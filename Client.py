@@ -3,7 +3,7 @@ import threading
 import tkinter as tk
 from tkinter import scrolledtext
 
-HOST = "149.102.225.58"  # replace with your server LAN IP, e.g., 192.168.1.5
+HOST = "100.127.255.249"  # replace with your server LAN IP, e.g., 192.168.1.5
 PORT = 8080
 
 sock = None
