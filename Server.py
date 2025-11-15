@@ -1,65 +1,53 @@
 import socket
 import threading
 
-HOST = "0.0.0.0"
+HOST = "0.0.0.0"  # listen on all network interfaces
 PORT = 8080
 
-clients = []        # list of client sockets
-clients_lock = threading.Lock()
+clients = []  # list of connected clients
 
 
-def broadcast(message, sender=None):
-    """Send message to all connected clients except sender."""
-    with clients_lock:
-        for client in clients:
-            if client != sender:
-                try:
-                    client.sendall(message.encode())
-                except:
-                    pass
+def broadcast(message, sender_conn):
+    """Send message to all clients except sender"""
+    for client in clients:
+        if client != sender_conn:
+            try:
+                client.sendall(message.encode())
+            except:
+                clients.remove(client)
 
 
 def handle_client(conn, addr):
     print(f"[CONNECTED] {addr}")
-
-    with clients_lock:
-        clients.append(conn)
-
+    clients.append(conn)
     try:
         while True:
-            data = conn.recv(1024)
+            data = conn.recv(2048)
             if not data:
                 break
 
             message = data.decode()
-            print(f"[RECEIVED from {addr}] {message}")
-
-            broadcast(f"[{addr[0]}] {message}", sender=conn)
+            print(f"[{addr}] {message}")
+            broadcast(f"{addr[0]}: {message}", conn)
 
     except Exception as e:
         print(f"[ERROR] {addr} → {e}")
-
     finally:
-        with clients_lock:
-            clients.remove(conn)
-
         conn.close()
+        if conn in clients:
+            clients.remove(conn)
         print(f"[DISCONNECTED] {addr}")
-        broadcast(f"[SERVER] {addr[0]} left the chat.")
 
 
 def start_server():
-    print(f"[STARTING] Multi-user Server on {HOST}:{PORT}")
+    print(f"[STARTING] Server on {HOST}:{PORT}")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
         server.bind((HOST, PORT))
         server.listen()
-
         while True:
             conn, addr = server.accept()
-            broadcast(f"[SERVER] {addr[0]} joined the chat.")
             threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
 
 
 if __name__ == "__main__":
     start_server()
-
