@@ -3,29 +3,34 @@ import threading
 import tkinter as tk
 from tkinter import simpledialog, scrolledtext
 import time
+import queue
 
 PORT = 8080
 sock = None
 connected = False
 reconnect_interval = 5  # seconds
+message_queue = queue.Queue()
 
 # ---------------- Helper ----------------
 def safe_add_message(text, align="left", color="#000000"):
-    chat_box.configure(state="normal")
-    tag = align
-    chat_box.tag_configure(tag, justify=align, foreground=color)
-    chat_box.insert(tk.END, text + "\n", tag)
-    chat_box.configure(state="disabled")
-    chat_box.see(tk.END)
-    entry.focus_set()
+    # Use after() to safely update Tkinter from any thread
+    def _insert():
+        chat_box.configure(state="normal")
+        tag = align
+        chat_box.tag_configure(tag, justify=align, foreground=color)
+        chat_box.insert(tk.END, text + "\n", tag)
+        chat_box.configure(state="disabled")
+        chat_box.see(tk.END)
+        entry.focus_set()
+    window.after(0, _insert)
 
 # ---------------- Connect ----------------
 def connect_to_server():
     global sock, connected
     while not connected:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             sock.connect((server_ip, PORT))
             connected = True
             safe_add_message(f"[Connected to {server_ip}:{PORT}]", "left", "#888")
@@ -34,7 +39,9 @@ def connect_to_server():
             threading.Thread(target=receive_messages, daemon=True).start()
         except Exception as e:
             safe_add_message(f"[Reconnect failed: {e} → retrying in {reconnect_interval}s]", "left", "red")
-            sock.close()
+            try:
+                sock.close()
+            except: pass
             time.sleep(reconnect_interval)
 
 def receive_messages():
@@ -46,7 +53,6 @@ def receive_messages():
                 safe_add_message("[Disconnected from server]", "left", "red")
                 connected = False
                 sock.close()
-                safe_add_message(f"[Attempting to reconnect in {reconnect_interval}s]", "left", "red")
                 send_btn.config(state=tk.DISABLED)
                 entry.config(state=tk.DISABLED)
                 threading.Thread(target=connect_to_server, daemon=True).start()
@@ -56,8 +62,8 @@ def receive_messages():
         except Exception as e:
             safe_add_message(f"[Receive error: {e}]", "left", "red")
             connected = False
-            sock.close()
-            safe_add_message(f"[Attempting to reconnect in {reconnect_interval}s]", "left", "red")
+            try: sock.close() 
+            except: pass
             send_btn.config(state=tk.DISABLED)
             entry.config(state=tk.DISABLED)
             threading.Thread(target=connect_to_server, daemon=True).start()
@@ -65,19 +71,20 @@ def receive_messages():
 
 def send_message(*args):
     global sock, connected
-    if not connected:
-        safe_add_message("[ERROR] Not connected to server", "left", "red")
-        return
-
     msg = entry.get().strip()
     if not msg:
+        return
+    if not connected:
+        safe_add_message("[ERROR] Not connected to server", "left", "red")
+        entry.delete(0, tk.END)
         return
     try:
         sock.sendall(msg.encode())
     except Exception as e:
-        safe_add_message(f"[ERROR sending message: {e}]", "left", "red")
+        safe_add_message(f"[Send error: {e}]", "left", "red")
         connected = False
-        sock.close()
+        try: sock.close() 
+        except: pass
         send_btn.config(state=tk.DISABLED)
         entry.config(state=tk.DISABLED)
         threading.Thread(target=connect_to_server, daemon=True).start()
@@ -124,4 +131,3 @@ else:
     safe_add_message("[ERROR] No server IP provided.", "left", "red")
 
 window.mainloop()
-
