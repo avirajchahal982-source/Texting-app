@@ -1,37 +1,34 @@
 import socket
 import threading
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import simpledialog, scrolledtext
 
-HOST = "100.127.255.249"  # replace with your server LAN IP, e.g., 192.168.1.5
-PORT = 8080
+PORT = 8080  # must match server
 
 sock = None
 
-
+# ---------------- Helper ----------------
 def safe_add_message(text, align="left", color="#000000"):
-    """Add a message to the chat box safely from any thread"""
     chat_box.configure(state="normal")
     tag = align
     chat_box.tag_configure(tag, justify=align, foreground=color)
     chat_box.insert(tk.END, text + "\n", tag)
     chat_box.configure(state="disabled")
     chat_box.see(tk.END)
-    entry.focus_set()  # keep typing focus
+    entry.focus_set()
 
-
+# ---------------- Connect ----------------
 def connect_to_server():
-    global sock
+    global sock, server_ip
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        sock.connect((HOST, PORT))
-        window.after(0, safe_add_message, "[Connected to server]", "left", "#888")
+        sock.connect((server_ip, PORT))
+        safe_add_message(f"[Connected to {server_ip}:{PORT}]", "left", "#888")
     except Exception as e:
-        window.after(0, safe_add_message, f"[ERROR] {e}", "left", "red")
+        safe_add_message(f"[ERROR] {e}", "left", "red")
         return
 
     threading.Thread(target=receive_messages, daemon=True).start()
-
 
 def receive_messages():
     global sock
@@ -41,12 +38,9 @@ def receive_messages():
             if not data:
                 break
             msg = data.decode()
-            # Show incoming messages from server
-            # We do not add "You:" here to avoid duplication
-            window.after(0, safe_add_message, msg, "left", "#1E90FF")
+            safe_add_message(msg, "left", "#1E90FF")
         except:
             break
-
 
 def send_message(*args):
     msg = entry.get().strip()
@@ -58,15 +52,12 @@ def send_message(*args):
         safe_add_message("[ERROR sending message]", "left", "red")
         return
     entry.delete(0, tk.END)
-    # Optionally: do not show "You: ..." locally because server will echo it
-    # safe_add_message(f"You: {msg}", "right", "#32CD32")
-
+    # server echoes your message; no local "You:" needed
 
 def on_escape(event):
     window.destroy()
 
-
-# ------------------ GUI ------------------
+# ---------------- GUI ----------------
 window = tk.Tk()
 window.title("LAN Chat")
 window.geometry("520x500")
@@ -93,6 +84,12 @@ entry.bind("<Return>", send_message)
 window.bind("<Escape>", on_escape)
 
 entry.focus_set()
-window.after(200, connect_to_server)
+
+# ---------------- Ask for server IP ----------------
+server_ip = simpledialog.askstring("Server IP", "Enter the server LAN IP:")
+if server_ip:
+    window.after(100, connect_to_server)
+else:
+    safe_add_message("[ERROR] No server IP provided.", "left", "red")
 
 window.mainloop()
