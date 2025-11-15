@@ -2,8 +2,8 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import scrolledtext
-#Enter server host's IP Adress here
-HOST = str(input("Enter hosts IP Adress If hosts device enter 0.0.0.0    "))
+
+HOST = "SERVER_IP_HERE"  # replace with server LAN IP, e.g., 192.168.1.5
 PORT = 8080
 
 sock = None
@@ -11,21 +11,17 @@ sock = None
 
 def safe_add_message(text, align, color):
     chat_box.configure(state="normal")
-
     tag = align
     chat_box.tag_configure(tag, justify=align, foreground=color)
     chat_box.insert(tk.END, text + "\n", tag)
-
     chat_box.configure(state="disabled")
     chat_box.see(tk.END)
-
-    entry.focus_set()   # <-- ALWAYS allow typing
+    entry.focus_set()  # always keep typing focus
 
 
 def connect_to_server():
     global sock
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
     try:
         sock.connect((HOST, PORT))
         window.after(0, safe_add_message, "[Connected to server]", "left", "#888")
@@ -43,10 +39,8 @@ def receive_messages():
             data = sock.recv(2048)
             if not data:
                 break
-
             msg = data.decode()
             window.after(0, safe_add_message, msg, "left", "#1E90FF")
-
         except:
             break
 
@@ -57,12 +51,10 @@ def send_message(*args):
         return
 
     safe_add_message(f"You: {msg}", "right", "#32CD32")
-
     try:
         sock.sendall(msg.encode())
     except:
         safe_add_message("[ERROR sending message]", "left", "red")
-
     entry.delete(0, tk.END)
 
 
@@ -70,12 +62,12 @@ def on_escape(event):
     window.destroy()
 
 
-# ----------------- UI -----------------
+# ------------------ GUI ------------------
 window = tk.Tk()
-window.title("Chat Client")
+window.title("LAN Chat")
 window.geometry("520x500")
 
-header = tk.Label(window, text="🟢 Online Chat", bg="#4A90E2",
+header = tk.Label(window, text="🟢 LAN Chat", bg="#4A90E2",
                   fg="white", font=("Arial", 16, "bold"), pady=10)
 header.pack(fill=tk.X)
 
@@ -93,14 +85,11 @@ send_btn = tk.Button(bottom, text="Send", font=("Arial", 12, "bold"),
                      bg="#4CAF50", fg="white", width=10, command=send_message)
 send_btn.pack(side=tk.RIGHT)
 
-# KEY FIX: bind Enter ONLY to entry, not window
+# Bind Enter only to entry
 entry.bind("<Return>", send_message)
-
 window.bind("<Escape>", on_escape)
 
 entry.focus_set()
-
 window.after(200, connect_to_server)
 
 window.mainloop()
-
