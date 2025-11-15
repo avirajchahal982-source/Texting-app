@@ -9,6 +9,9 @@ PORT = 8080
 sock = None
 
 
+# ---------------------------------------------------------
+# Networking
+# ---------------------------------------------------------
 def connect_to_server():
     global sock
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -18,38 +21,48 @@ def connect_to_server():
 
 
 def receive_messages():
-    """Constantly listen for server messages."""
     global sock
     while True:
         try:
-            data = sock.recv(1024)
+            data = sock.recv(2048)
             if not data:
                 break
 
             msg = data.decode()
-            chat_box.insert(tk.END, msg + "\n")
-            chat_box.see(tk.END)
+            add_message(msg, align="left", color="#1E90FF")
 
         except:
             break
 
 
 def send_message():
-    msg = entry.get()
+    msg = entry.get().strip()
     if not msg:
         return
 
     # Display locally
-    chat_box.insert(tk.END, f"You: {msg}\n")
-    chat_box.see(tk.END)
+    add_message(f"You: {msg}", align="right", color="#32CD32")
 
-    # Send to server
     try:
         sock.sendall(msg.encode())
     except:
-        chat_box.insert(tk.END, "[ERROR] Failed to send.\n")
+        add_message("[ERROR] Could not send message.", align="left", color="red")
 
     entry.delete(0, tk.END)
+
+
+def add_message(text, align="left", color="black"):
+    chat_box.configure(state="normal")
+
+    if align == "right":
+        chat_box.tag_configure("right", justify="right", foreground=color)
+        chat_box.insert(tk.END, text + "\n", "right")
+    else:
+        chat_box.tag_configure("left", justify="left", foreground=color)
+        chat_box.insert(tk.END, text + "\n", "left")
+
+    chat_box.configure(state="disabled")
+    chat_box.see(tk.END)
 
 
 def on_enter(event):
@@ -60,27 +73,60 @@ def on_escape(event):
     window.destroy()
 
 
-# ---- GUI ----
+# ---------------------------------------------------------
+# UI Setup
+# ---------------------------------------------------------
 window = tk.Tk()
-window.title("Multi-User Chat Client")
-window.geometry("500x450")
-window.resizable(False, False)
+window.title("Multi-User Chat")
+window.geometry("520x500")
+window.config(bg="#ECECEC")
 
-chat_box = scrolledtext.ScrolledText(window, wrap=tk.WORD, width=60, height=20)
-chat_box.pack(pady=10)
+# Header bar
+header = tk.Label(
+    window,
+    text="Online Chat",
+    bg="#4A90E2",
+    fg="white",
+    font=("Arial", 16, "bold"),
+    pady=10
+)
+header.pack(fill=tk.X)
 
-entry = tk.Entry(window, width=50, font=("Arial", 12))
-entry.pack(side=tk.LEFT, padx=10, pady=10)
+# Chat display box
+chat_box = scrolledtext.ScrolledText(
+    window,
+    wrap=tk.WORD,
+    state="disabled",
+    bg="white",
+    font=("Arial", 12),
+)
+chat_box.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-send_btn = tk.Button(window, text="Send", width=10, command=send_message)
-send_btn.pack(side=tk.LEFT)
+# Bottom frame for input bar
+bottom_frame = tk.Frame(window, bg="#ECECEC")
+bottom_frame.pack(fill=tk.X, padx=10, pady=10)
 
+entry = tk.Entry(bottom_frame, font=("Arial", 14))
+entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+
+send_btn = tk.Button(
+    bottom_frame,
+    text="Send",
+    font=("Arial", 12, "bold"),
+    bg="#4CAF50",
+    fg="white",
+    width=10,
+    command=send_message
+)
+send_btn.pack(side=tk.RIGHT)
+
+# Key bindings
 window.bind("<Return>", on_enter)
 window.bind("<Escape>", on_escape)
 
 entry.focus()
 
-# Connect to server at startup
+# Connect at startup
 connect_to_server()
 
 window.mainloop()
