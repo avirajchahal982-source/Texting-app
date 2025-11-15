@@ -3,7 +3,7 @@ import threading
 import tkinter as tk
 from tkinter import scrolledtext
 #Enter server host's IP Adress here
-HOST = "149.102.225.58"
+HOST = str(input("Enter hosts IP Adress If hosts device enter 0.0.0.0    "))
 PORT = 8080
 
 sock = None
