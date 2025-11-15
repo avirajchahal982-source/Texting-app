@@ -2,6 +2,7 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import simpledialog, scrolledtext
+import time  # <-- Added time import
 
 PORT = 8080
 sock = None
@@ -49,7 +50,7 @@ def receive_messages():
                     if sock:
                         sock.close()
                     sock = None
-        time.sleep(1)
+        time.sleep(1)  # <-- sleep for 1 second to avoid busy looping
 
 # Connect to server
 def connect_loop():
@@ -67,44 +68,15 @@ def connect_loop():
                 sock.sendall(username.encode())
                 safe_add_message(f"[Connected to {server_ip}:{PORT}]", "#888")
                 connected = True
+            except socket.gaierror:
+                safe_add_message("[ERROR] Invalid server IP address.", "red")
+                break  # <-- Stop trying to reconnect if the server IP is invalid
             except Exception as e:
                 safe_add_message(f"[Reconnect failed → retrying in 5s]", "red")
                 sock = None
-                time.sleep(5)
+                time.sleep(5)  # Retry connection after 5 seconds
         time.sleep(1)
 
 # GUI Setup
 window = tk.Tk()
-window.title("Global Chat")
-window.geometry("520x500")
-
-header = tk.Label(window, text="Global Chat", bg="#4A90E2", fg="white", font=("Arial", 16, "bold"), pady=10)
-header.pack(fill=tk.X)
-
-chat_box = scrolledtext.ScrolledText(window, wrap=tk.WORD, state="disabled", bg="white", font=("Arial", 12))
-chat_box.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-
-bottom = tk.Frame(window)
-bottom.pack(fill=tk.X, padx=10, pady=10)
-
-entry = tk.Entry(bottom, font=("Arial", 14))
-entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-
-send_btn = tk.Button(bottom, text="Send", font=("Arial", 12, "bold"), bg="#4CAF50", fg="white", width=10, command=send_message)
-send_btn.pack(side=tk.RIGHT)
-
-entry.bind("<Return>", send_message)
-window.bind("<Escape>", lambda e: window.destroy())
-entry.focus_set()
-
-# Server IP and Username
-server_ip = simpledialog.askstring("Server IP", "Enter server IP:")
-username = simpledialog.askstring("Username", "Enter your username:")
-
-if server_ip and username:
-    threading.Thread(target=receive_messages, daemon=True).start()
-    threading.Thread(target=connect_loop, daemon=True).start()
-else:
-    safe_add_message("[ERROR] Server IP or username not provided.", "red")
-
-window.mainloop()
+window.tit
