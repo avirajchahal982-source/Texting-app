@@ -4,13 +4,14 @@ import time
 from datetime import datetime
 import tkinter as tk
 from tkinter import simpledialog, scrolledtext
+import select
 
-PORT = 8080  # changed from 9000
+PORT = 8080  # Server port
 sock = None
 connected = False
 username = None
 
-#GUI
+# GUI
 def safe_add_message(text, color="#000000", align="left"):
     chat_box.configure(state="normal")
     tag = align
@@ -21,27 +22,30 @@ def safe_add_message(text, color="#000000", align="left"):
     entry.focus_set()
 
 def send_message(*args):
+    global sock, connected
     msg = entry.get().strip()
     if not msg or not connected:
         return
     try:
         sock.sendall(msg.encode())
+        entry.delete(0, tk.END)
     except:
         safe_add_message("[ERROR sending message]", "red")
-        return
-    entry.delete(0, tk.END)
 
 def receive_messages():
     global sock, connected
     while True:
-        if sock:
+        if sock and connected:
             try:
-                data = sock.recv(2048)
-                if not data:
-                    raise ConnectionError
-                msg = data.decode()
-                safe_add_message(msg, "#1E90FF")
-            except:
+                # Use select for non-blocking receive
+                ready = select.select([sock], [], [], 0.5)
+                if ready[0]:
+                    data = sock.recv(2048)
+                    if not data:
+                        raise ConnectionError
+                    msg = data.decode()
+                    safe_add_message(msg, "#1E90FF")
+            except (ConnectionError, socket.error):
                 if connected:
                     safe_add_message("[Disconnected, reconnecting...]", "red")
                     connected = False
@@ -56,19 +60,19 @@ def connect_loop():
         if not connected:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)  # Set timeout to prevent hanging indefinitely
                 sock.connect((server_ip, PORT))
-                # Send username to server
-                sock.recv(1024)  # receive USERNAME? prompt
                 sock.sendall(username.encode())
                 safe_add_message(f"[Connected to {server_ip}:{PORT}]", "#888")
                 connected = True
-            except:
+            except (socket.error, ConnectionRefusedError):
                 safe_add_message(f"[Reconnect failed → retrying in 5s]", "red")
+                sock.close()
                 sock = None
                 time.sleep(5)
         time.sleep(1)
 
-#GUI Setup
+# GUI Setup
 window = tk.Tk()
 window.title("Python Chat")
 window.geometry("520x500")
