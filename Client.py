@@ -2,8 +2,8 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import scrolledtext
-
-HOST = "127.0.0.1"
+#Enter server host's IP Adress here
+HOST = "149.102.225.58"
 PORT = 8080
 
 sock = None
