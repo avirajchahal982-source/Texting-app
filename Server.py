@@ -5,20 +5,24 @@ HOST = "0.0.0.0"  # Listen on all interfaces
 PORT = 8080        # Port to use
 
 clients = []  # List to store connected client sockets
+clients_lock = threading.Lock()  # To safely handle clients in multithreading
 
 # ---------------- Broadcast function ----------------
 def broadcast(message):
     """Send a message to all connected clients"""
-    for client in clients:
-        try:
-            client.sendall(message.encode())
-        except:
-            clients.remove(client)
+    with clients_lock:
+        for client in clients.copy():  # iterate over a copy to avoid modification issues
+            try:
+                client.sendall(message.encode())
+            except Exception as e:
+                print(f"[ERROR] Removing client {client.getpeername()} → {e}")
+                clients.remove(client)
 
 # ---------------- Handle each client ----------------
 def handle_client(conn, addr):
     print(f"[CONNECTED] {addr}")
-    clients.append(conn)
+    with clients_lock:
+        clients.append(conn)
     try:
         while True:
             data = conn.recv(2048)
@@ -34,9 +38,10 @@ def handle_client(conn, addr):
     except Exception as e:
         print(f"[ERROR] {addr} → {e}")
     finally:
+        with clients_lock:
+            if conn in clients:
+                clients.remove(conn)
         conn.close()
-        if conn in clients:
-            clients.remove(conn)
         print(f"[DISCONNECTED] {addr}")
 
 # ---------------- Start the server ----------------
@@ -54,4 +59,3 @@ def start_server():
 
 if __name__ == "__main__":
     start_server()
-
