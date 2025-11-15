@@ -1,22 +1,21 @@
 import socket
 import threading
 
-HOST = "0.0.0.0"  # listen on all network interfaces
-PORT = 8080
+HOST = "0.0.0.0"  # Listen on all interfaces
+PORT = 8080        # Port to use
 
-clients = []  # list of connected clients
+clients = []  # List to store connected client sockets
 
-
-def broadcast(message, sender_conn):
-    """Send message to all clients except sender"""
+# ---------------- Broadcast function ----------------
+def broadcast(message):
+    """Send a message to all connected clients"""
     for client in clients:
-        if client != sender_conn:
-            try:
-                client.sendall(message.encode())
-            except:
-                clients.remove(client)
+        try:
+            client.sendall(message.encode())
+        except:
+            clients.remove(client)
 
-
+# ---------------- Handle each client ----------------
 def handle_client(conn, addr):
     print(f"[CONNECTED] {addr}")
     clients.append(conn)
@@ -28,7 +27,9 @@ def handle_client(conn, addr):
 
             message = data.decode()
             print(f"[{addr}] {message}")
-            broadcast(f"{addr[0]}: {message}", conn)
+            
+            # Broadcast to everyone (including sender)
+            broadcast(f"{addr[0]}: {message}")
 
     except Exception as e:
         print(f"[ERROR] {addr} → {e}")
@@ -38,16 +39,19 @@ def handle_client(conn, addr):
             clients.remove(conn)
         print(f"[DISCONNECTED] {addr}")
 
-
+# ---------------- Start the server ----------------
 def start_server():
     print(f"[STARTING] Server on {HOST}:{PORT}")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
         server.bind((HOST, PORT))
         server.listen()
+        print(f"[LISTENING] Waiting for connections...")
+
         while True:
             conn, addr = server.accept()
-            threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
-
+            thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            thread.start()
 
 if __name__ == "__main__":
     start_server()
+
