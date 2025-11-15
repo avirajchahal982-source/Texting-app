@@ -18,8 +18,8 @@ def safe_add_message(text, color="#000000", align="left"):
     chat_box.tag_configure(tag, justify=align, foreground=color)
     chat_box.insert(tk.END, text + "\n", tag)
     chat_box.configure(state="disabled")
-    chat_box.see(tk.END)
-    entry.focus_set()
+    chat_box.see(tk.END)  # Scroll to the bottom
+    entry.focus_set()  # Ensure the focus stays on the entry box
 
 def send_message(*args):
     global sock, connected
@@ -27,8 +27,9 @@ def send_message(*args):
     if not msg or not connected:
         return
     try:
-        sock.sendall(msg.encode())
-        entry.delete(0, tk.END)
+        print(f"Sending message: {msg}")  # Debugging line to show the message being sent
+        sock.sendall(msg.encode())  # Send message to the server
+        entry.delete(0, tk.END)  # Clear the entry field after sending
     except:
         safe_add_message("[ERROR sending message]", "red")
 
@@ -44,7 +45,8 @@ def receive_messages():
                     if not data:
                         raise ConnectionError
                     msg = data.decode()
-                    safe_add_message(msg, "#1E90FF")
+                    print(f"Received message: {msg}")  # Debugging line to show the received message
+                    safe_add_message(msg, "#1E90FF")  # Add message to chat box
             except (ConnectionError, socket.error):
                 if connected:
                     safe_add_message("[Disconnected, reconnecting...]", "red")
