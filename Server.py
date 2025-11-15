@@ -1,15 +1,4 @@
-import socket
-HOST = "676.7.6.7"
-PORT = 67676
-
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    s.bind((HOST, PORT))
-    s.listen()
-    conn, addr = s.accept()
-    with conn:
-        print('Connected by', addr)
-        while True:
-            data = conn.recv(1024)
-            if not data:
-                break
-            conn.sendall(data)
+def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
+    server_address = ('676.7.6.7', 676767)
+    httpd = server_class(server_address, handler_class)
+    httpd.serve_forever()
