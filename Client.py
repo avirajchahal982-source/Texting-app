@@ -4,7 +4,6 @@ import tkinter as tk
 from tkinter import simpledialog, scrolledtext
 
 PORT = 8080  # must match server
-
 sock = None
 
 # ---------------- Helper ----------------
@@ -24,8 +23,12 @@ def connect_to_server():
     try:
         sock.connect((server_ip, PORT))
         safe_add_message(f"[Connected to {server_ip}:{PORT}]", "left", "#888")
+        send_btn.config(state=tk.NORMAL)
+        entry.config(state=tk.NORMAL)
     except Exception as e:
-        safe_add_message(f"[ERROR] {e}", "left", "red")
+        safe_add_message(f"[ERROR connecting to server: {e}]", "left", "red")
+        send_btn.config(state=tk.DISABLED)
+        entry.config(state=tk.DISABLED)
         return
 
     threading.Thread(target=receive_messages, daemon=True).start()
@@ -36,23 +39,33 @@ def receive_messages():
         try:
             data = sock.recv(2048)
             if not data:
+                safe_add_message("[Disconnected from server]", "left", "red")
+                send_btn.config(state=tk.DISABLED)
+                entry.config(state=tk.DISABLED)
                 break
             msg = data.decode()
             safe_add_message(msg, "left", "#1E90FF")
-        except:
+        except Exception as e:
+            safe_add_message(f"[ERROR receiving message: {e}]", "left", "red")
+            send_btn.config(state=tk.DISABLED)
+            entry.config(state=tk.DISABLED)
             break
 
 def send_message(*args):
+    global sock
+    if sock is None:
+        safe_add_message("[ERROR] Not connected to server", "left", "red")
+        return
+
     msg = entry.get().strip()
     if not msg:
         return
     try:
         sock.sendall(msg.encode())
-    except:
-        safe_add_message("[ERROR sending message]", "left", "red")
+    except Exception as e:
+        safe_add_message(f"[ERROR sending message: {e}]", "left", "red")
         return
     entry.delete(0, tk.END)
-    # server echoes your message; no local "You:" needed
 
 def on_escape(event):
     window.destroy()
@@ -79,6 +92,10 @@ entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 send_btn = tk.Button(bottom, text="Send", font=("Arial", 12, "bold"),
                      bg="#4CAF50", fg="white", width=10, command=send_message)
 send_btn.pack(side=tk.RIGHT)
+
+# Disabled until connected
+send_btn.config(state=tk.DISABLED)
+entry.config(state=tk.DISABLED)
 
 entry.bind("<Return>", send_message)
 window.bind("<Escape>", on_escape)
