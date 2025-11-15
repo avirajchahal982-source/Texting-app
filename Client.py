@@ -10,18 +10,39 @@ sock = None
 
 
 # ---------------------------------------------------------
+# Safe UI message insert (main thread only)
+# ---------------------------------------------------------
+def safe_add_message(text, align, color):
+    chat_box.configure(state="normal")
+
+    tag = align
+    chat_box.tag_configure(tag, justify=align, foreground=color, font=("Arial", 12))
+
+    chat_box.insert(tk.END, text + "\n", tag)
+    chat_box.configure(state="disabled")
+    chat_box.see(tk.END)
+
+
+# ---------------------------------------------------------
 # Networking
 # ---------------------------------------------------------
 def connect_to_server():
     global sock
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((HOST, PORT))
+
+    try:
+        sock.connect((HOST, PORT))
+    except Exception as e:
+        safe_add_message(f"[ERROR] Could not connect: {e}", "left", "red")
+        return
 
     threading.Thread(target=receive_messages, daemon=True).start()
+    safe_add_message("[Connected to server]", "left", "#888")
 
 
 def receive_messages():
     global sock
+
     while True:
         try:
             data = sock.recv(2048)
@@ -29,7 +50,9 @@ def receive_messages():
                 break
 
             msg = data.decode()
-            add_message(msg, align="left", color="#1E90FF")
+
+            # schedule UI update from main thread
+            window.after(0, safe_add_message, msg, "left", "#1E90FF")
 
         except:
             break
@@ -40,29 +63,15 @@ def send_message():
     if not msg:
         return
 
-    # Display locally
-    add_message(f"You: {msg}", align="right", color="#32CD32")
+    # Display your own message
+    safe_add_message(f"You: {msg}", "right", "#32CD32")
 
     try:
         sock.sendall(msg.encode())
     except:
-        add_message("[ERROR] Could not send message.", align="left", color="red")
+        safe_add_message("[ERROR] Failed to send message", "left", "red")
 
     entry.delete(0, tk.END)
-
-
-def add_message(text, align="left", color="black"):
-    chat_box.configure(state="normal")
-
-    if align == "right":
-        chat_box.tag_configure("right", justify="right", foreground=color)
-        chat_box.insert(tk.END, text + "\n", "right")
-    else:
-        chat_box.tag_configure("left", justify="left", foreground=color)
-        chat_box.insert(tk.END, text + "\n", "left")
-
-    chat_box.configure(state="disabled")
-    chat_box.see(tk.END)
 
 
 def on_enter(event):
@@ -74,7 +83,7 @@ def on_escape(event):
 
 
 # ---------------------------------------------------------
-# UI Setup
+# UI
 # ---------------------------------------------------------
 window = tk.Tk()
 window.title("Multi-User Chat")
@@ -84,7 +93,7 @@ window.config(bg="#ECECEC")
 # Header bar
 header = tk.Label(
     window,
-    text="Online Chat",
+    text="🟢 Online Chat",
     bg="#4A90E2",
     fg="white",
     font=("Arial", 16, "bold"),
@@ -92,25 +101,25 @@ header = tk.Label(
 )
 header.pack(fill=tk.X)
 
-# Chat display box
+# Chat box
 chat_box = scrolledtext.ScrolledText(
     window,
     wrap=tk.WORD,
     state="disabled",
     bg="white",
-    font=("Arial", 12),
+    font=("Arial", 12)
 )
 chat_box.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-# Bottom frame for input bar
-bottom_frame = tk.Frame(window, bg="#ECECEC")
-bottom_frame.pack(fill=tk.X, padx=10, pady=10)
+# Bottom input area
+bottom = tk.Frame(window, bg="#ECECEC")
+bottom.pack(fill=tk.X, padx=10, pady=10)
 
-entry = tk.Entry(bottom_frame, font=("Arial", 14))
+entry = tk.Entry(bottom, font=("Arial", 14))
 entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 
 send_btn = tk.Button(
-    bottom_frame,
+    bottom,
     text="Send",
     font=("Arial", 12, "bold"),
     bg="#4CAF50",
@@ -120,13 +129,13 @@ send_btn = tk.Button(
 )
 send_btn.pack(side=tk.RIGHT)
 
-# Key bindings
 window.bind("<Return>", on_enter)
 window.bind("<Escape>", on_escape)
 
 entry.focus()
 
-# Connect at startup
-connect_to_server()
+# Connect after UI loads
+window.after(200, connect_to_server)
 
 window.mainloop()
+
