@@ -3,20 +3,21 @@ import threading
 import tkinter as tk
 from tkinter import scrolledtext
 
-HOST = input("LANID:  ")  # replace with server LAN IP, e.g., 192.168.1.5
+HOST = "SERVER_IP_HERE"  # replace with your server LAN IP, e.g., 192.168.1.5
 PORT = 8080
 
 sock = None
 
 
-def safe_add_message(text, align, color):
+def safe_add_message(text, align="left", color="#000000"):
+    """Add a message to the chat box safely from any thread"""
     chat_box.configure(state="normal")
     tag = align
     chat_box.tag_configure(tag, justify=align, foreground=color)
     chat_box.insert(tk.END, text + "\n", tag)
     chat_box.configure(state="disabled")
     chat_box.see(tk.END)
-    entry.focus_set()  # always keep typing focus
+    entry.focus_set()  # keep typing focus
 
 
 def connect_to_server():
@@ -40,6 +41,8 @@ def receive_messages():
             if not data:
                 break
             msg = data.decode()
+            # Show incoming messages from server
+            # We do not add "You:" here to avoid duplication
             window.after(0, safe_add_message, msg, "left", "#1E90FF")
         except:
             break
@@ -49,13 +52,14 @@ def send_message(*args):
     msg = entry.get().strip()
     if not msg:
         return
-
-    safe_add_message(f"You: {msg}", "right", "#32CD32")
     try:
         sock.sendall(msg.encode())
     except:
         safe_add_message("[ERROR sending message]", "left", "red")
+        return
     entry.delete(0, tk.END)
+    # Optionally: do not show "You: ..." locally because server will echo it
+    # safe_add_message(f"You: {msg}", "right", "#32CD32")
 
 
 def on_escape(event):
@@ -85,7 +89,6 @@ send_btn = tk.Button(bottom, text="Send", font=("Arial", 12, "bold"),
                      bg="#4CAF50", fg="white", width=10, command=send_message)
 send_btn.pack(side=tk.RIGHT)
 
-# Bind Enter only to entry
 entry.bind("<Return>", send_message)
 window.bind("<Escape>", on_escape)
 
