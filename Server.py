@@ -1,26 +1,15 @@
-import http.server
-import socketserver
+import socket
+Host = 676.7.6.7
+PORT = input("Enter Port:   ")
 
-PORT = 8000
-
-class MyHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
-        self.wfile.write(b"<h1>Hello from your Python Server!</h1>")
-
-    def do_POST(self):
-        # Handle POST requests here
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length).decode('utf-8')
-        print(f"Received POST data: {post_data}")
-
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"POST request received successfully!")
-
-with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
-    print(f"Serving at port {PORT}")
-    httpd.serve_forever()
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind((HOST, PORT))
+    s.listen()
+    conn, addr = s.accept()
+    with conn:
+        print('Connected by', addr)
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            conn.sendall(data)
