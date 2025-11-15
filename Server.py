@@ -1,6 +1,6 @@
 import socket
 Host = 676.7.6.7
-PORT = input("Enter Port:   ")
+PORT = 67676
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
