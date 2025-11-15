@@ -2,9 +2,12 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import simpledialog, scrolledtext
+import time
 
-PORT = 8080  # must match server
+PORT = 8080
 sock = None
+connected = False
+reconnect_interval = 5  # seconds
 
 # ---------------- Helper ----------------
 def safe_add_message(text, align="left", color="#000000"):
@@ -18,42 +21,51 @@ def safe_add_message(text, align="left", color="#000000"):
 
 # ---------------- Connect ----------------
 def connect_to_server():
-    global sock, server_ip
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.connect((server_ip, PORT))
-        safe_add_message(f"[Connected to {server_ip}:{PORT}]", "left", "#888")
-        send_btn.config(state=tk.NORMAL)
-        entry.config(state=tk.NORMAL)
-    except Exception as e:
-        safe_add_message(f"[ERROR connecting to server: {e}]", "left", "red")
-        send_btn.config(state=tk.DISABLED)
-        entry.config(state=tk.DISABLED)
-        return
-
-    threading.Thread(target=receive_messages, daemon=True).start()
+    global sock, connected
+    while not connected:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        try:
+            sock.connect((server_ip, PORT))
+            connected = True
+            safe_add_message(f"[Connected to {server_ip}:{PORT}]", "left", "#888")
+            send_btn.config(state=tk.NORMAL)
+            entry.config(state=tk.NORMAL)
+            threading.Thread(target=receive_messages, daemon=True).start()
+        except Exception as e:
+            safe_add_message(f"[Reconnect failed: {e} → retrying in {reconnect_interval}s]", "left", "red")
+            sock.close()
+            time.sleep(reconnect_interval)
 
 def receive_messages():
-    global sock
-    while True:
+    global sock, connected
+    while connected:
         try:
             data = sock.recv(2048)
             if not data:
                 safe_add_message("[Disconnected from server]", "left", "red")
+                connected = False
+                sock.close()
+                safe_add_message(f"[Attempting to reconnect in {reconnect_interval}s]", "left", "red")
                 send_btn.config(state=tk.DISABLED)
                 entry.config(state=tk.DISABLED)
+                threading.Thread(target=connect_to_server, daemon=True).start()
                 break
             msg = data.decode()
             safe_add_message(msg, "left", "#1E90FF")
         except Exception as e:
-            safe_add_message(f"[ERROR receiving message: {e}]", "left", "red")
+            safe_add_message(f"[Receive error: {e}]", "left", "red")
+            connected = False
+            sock.close()
+            safe_add_message(f"[Attempting to reconnect in {reconnect_interval}s]", "left", "red")
             send_btn.config(state=tk.DISABLED)
             entry.config(state=tk.DISABLED)
+            threading.Thread(target=connect_to_server, daemon=True).start()
             break
 
 def send_message(*args):
-    global sock
-    if sock is None:
+    global sock, connected
+    if not connected:
         safe_add_message("[ERROR] Not connected to server", "left", "red")
         return
 
@@ -64,7 +76,11 @@ def send_message(*args):
         sock.sendall(msg.encode())
     except Exception as e:
         safe_add_message(f"[ERROR sending message: {e}]", "left", "red")
-        return
+        connected = False
+        sock.close()
+        send_btn.config(state=tk.DISABLED)
+        entry.config(state=tk.DISABLED)
+        threading.Thread(target=connect_to_server, daemon=True).start()
     entry.delete(0, tk.END)
 
 def on_escape(event):
@@ -93,20 +109,19 @@ send_btn = tk.Button(bottom, text="Send", font=("Arial", 12, "bold"),
                      bg="#4CAF50", fg="white", width=10, command=send_message)
 send_btn.pack(side=tk.RIGHT)
 
-# Disabled until connected
 send_btn.config(state=tk.DISABLED)
 entry.config(state=tk.DISABLED)
 
 entry.bind("<Return>", send_message)
 window.bind("<Escape>", on_escape)
-
 entry.focus_set()
 
 # ---------------- Ask for server IP ----------------
 server_ip = simpledialog.askstring("Server IP", "Enter the server LAN IP:")
 if server_ip:
-    window.after(100, connect_to_server)
+    threading.Thread(target=connect_to_server, daemon=True).start()
 else:
     safe_add_message("[ERROR] No server IP provided.", "left", "red")
 
 window.mainloop()
+
